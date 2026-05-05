@@ -1,0 +1,20 @@
+{
+    "name": "fauza/template",
+    "description": "Best template of all time !!!",
+    "type": "project",
+    "autoload": {
+        "psr-4": {
+            "Fauza\\Template\\": "src/"
+        }
+    },
+    "authors": [{
+        "name": "FauZaPespi"
+    }],
+    "license": "Palms",
+    "minimum-stability": "stable",
+    "require": {
+        "slim/slim": "^4.15",
+        "slim/psr7": "^1.8",
+        "slim/php-view": "^3.4"
+    }
+}

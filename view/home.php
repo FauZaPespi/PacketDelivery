@@ -1,0 +1,1 @@
+<p>Hello World! Slim fonctionne avec Docker.</p>
