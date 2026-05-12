@@ -6,14 +6,14 @@
                 <div class="app-header-left">
                     <p class="app-greeting">
                         Bonjour
-                        <?= htmlspecialchars(($user['prenom'] ?? '') . ' ' . ($user['nom'] ?? '')) ?>
+                        <?= htmlspecialchars(($user->prenom ?? '') . ' ' . ($user->nom ?? '')) ?>
                     </p>
                 </div>
                 <div class="app-header-logo">
                     <img src="/img/logo.png" alt="Logo Packet Delivery">
                 </div>
                 <div class="app-header-right">
-                    <a href="/" class="app-logout-btn" title="Se déconnecter" aria-label="Se déconnecter">
+                    <a href="/logout" class="app-logout-btn" title="Se déconnecter" aria-label="Se déconnecter">
                         <i class="bi bi-power"></i>
                     </a>
                 </div>

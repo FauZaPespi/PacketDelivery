@@ -15,6 +15,7 @@
                 </header>
 
                 <form action="/login" method="post" class="welcome-form" novalidate>
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>">
                     <div class="mb-3">
                         <label for="email" class="form-label">Adresse email</label>
                         <input type="email" id="email" name="email" class="form-control"

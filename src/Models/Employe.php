@@ -7,16 +7,16 @@ class Employe
     public string $prenom;
     public string $email;
     public string $password;
-    public bool $role; // true for admin, false for livreur
+    public bool $estLivreur;
 
-    function __construct(int $id, string $nom, string $prenom, string $email, string $password, bool $role)
+    function __construct(int $id, string $nom, string $prenom, string $email, string $password, bool $estLivreur)
     {
         $this->id = $id;
         $this->nom = $nom;
         $this->prenom = $prenom;
         $this->email = $email;
         $this->password = $password;
-        $this->role = $role;
+        $this->estLivreur = $estLivreur;
     }
 }
 ?>
