@@ -7,6 +7,15 @@ services:
     container_name: ${APP_NAME}_php
     volumes:
       - .:/var/www/html
+      - ./docker/php/php.ini:/usr/local/etc/php/php.ini
+    environment:
+      MARIADB_HOST: mariadb
+      MARIADB_PORT: 3306
+      MARIADB_DATABASE: ${MARIADB_DATABASE}
+      MARIADB_USER: ${MARIADB_USER}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+    depends_on:
+      - mariadb
     networks:
       - app_network
 
@@ -23,8 +32,37 @@ services:
       - php
     networks:
       - app_network
+  mariadb:
+    image: mariadb:latest
+    container_name: ${APP_NAME}_mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MARIADB_ROOT}
+      MYSQL_DATABASE: ${MARIADB_DATABASE}
+      MYSQL_USER: ${MARIADB_USER}
+      MYSQL_PASSWORD: ${MARIADB_PASSWORD}
+    volumes:
+      - maria_data:/var/lib/mysql
+      - ./docker/sql/db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app_network
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: ${APP_NAME}_phpmyadmin
+    environment:
+      PMA_HOST: mariadb
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: ${MARIADB_ROOT}
+    ports:
+      - "${PMA_PORT:-8081}:80"
+    depends_on:
+      - mariadb
+    networks:
+      - app_network
 
 networks:
   app_network:
     name: ${APP_NAME}_network
     driver: bridge
+
+volumes:
+  maria_data:
