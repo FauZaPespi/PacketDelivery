@@ -41,7 +41,7 @@
                 <hr class="my-4">
 
                 <section class="welcome-description">
-                    <p class="mb-0 small text-muted">
+                    <p class="mb-0 form-text">
                         Packet Delivery est l'application web de gestion des livraisons de colis
                         à Genève. Elle permet aux employés administratifs de créer, modifier et
                         attribuer des paquets aux livreurs, et aux livreurs d'élaborer leur route

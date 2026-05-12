@@ -2,60 +2,64 @@
     <div class="container py-4 d-flex flex-grow-1 align-items-start justify-content-center">
         <div class="app-card card shadow-sm w-100">
 
-            <header class="app-header">
-                <div class="app-header-left">
-                    <p class="app-greeting">
+            <nav class="navbar navbar-light app-navbar border-bottom px-3">
+                <div class="container-fluid p-0 d-flex align-items-center justify-content-between gap-3">
+                    <span class="navbar-text app-greeting mb-0 text-truncate">
                         Bonjour
                         <?= htmlspecialchars(($user->prenom ?? '') . ' ' . ($user->nom ?? '')) ?>
-                    </p>
-                </div>
-                <div class="app-header-logo">
-                    <img src="/img/logo.png" alt="Logo Packet Delivery">
-                </div>
-                <div class="app-header-right">
-                    <a href="/logout" class="app-logout-btn" title="Se déconnecter" aria-label="Se déconnecter">
+                    </span>
+                    <img src="/img/logo.png" alt="Logo Packet Delivery" class="app-navbar-logo">
+                    <a href="/logout"
+                        class="btn btn-outline-danger btn-sm d-inline-flex align-items-center justify-content-center"
+                        title="Se déconnecter" aria-label="Se déconnecter">
                         <i class="bi bi-power"></i>
                     </a>
                 </div>
-            </header>
+            </nav>
 
             <section class="app-body row g-4">
 
-                <div class="col-md-6">
+                <div class="col-12 col-lg-6">
                     <h2 class="app-panel-title">Paquets</h2>
-                    <input type="search" class="form-control app-search"
-                           placeholder="Rechercher par n° postal" aria-label="Rechercher un paquet">
-                    <ul class="app-list" aria-label="Liste des paquets">
+                    <div class="mb-3">
+                        <input type="search" class="form-control"
+                            placeholder="Rechercher par n° postal" aria-label="Rechercher un paquet">
+                    </div>
+                    <ul class="list-group app-list-group mb-0" aria-label="Liste des paquets">
                         <?php foreach (($paquets ?? []) as $paquet): ?>
-                            <li class="app-list-item">
-                                <?= htmlspecialchars($paquet['numero']) ?>
-                                (<?= htmlspecialchars($paquet['statut']) ?>)
+                            <li class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" tabindex="0">
+                                <span><?= htmlspecialchars($paquet['numero']) ?></span>
+                                <span class="badge text-bg-<?= $paquet['statut'] === 'En cours de livraison' ? 'info' : ($paquet['statut'] === 'Livré' ? 'success' : 'warning') ?>">
+                                    <span class="small"><?= htmlspecialchars($paquet['statut']) ?></span>
+                                </span>
                             </li>
                         <?php endforeach; ?>
                     </ul>
                     <div class="app-panel-actions">
-                        <button type="button" class="app-icon-btn" title="Ajouter un paquet" aria-label="Ajouter un paquet">
+                        <button type="button" class="btn btn-outline-primary app-icon-btn" title="Ajouter un paquet" aria-label="Ajouter un paquet">
                             <i class="bi bi-plus-lg"></i>
                         </button>
-                        <button type="button" class="app-icon-btn" title="Modifier / supprimer un paquet" aria-label="Modifier ou supprimer un paquet">
+                        <button type="button" class="btn btn-outline-primary app-icon-btn" title="Modifier / supprimer un paquet" aria-label="Modifier ou supprimer un paquet">
                             <i class="bi bi-pencil"></i>
                         </button>
                     </div>
                 </div>
 
-                <div class="col-md-6">
+                <div class="col-12 col-lg-6">
                     <h2 class="app-panel-title">Livreurs</h2>
-                    <input type="search" class="form-control app-search"
-                           placeholder="Rechercher par nom ou prénom" aria-label="Rechercher un livreur">
-                    <ul class="app-list" aria-label="Liste des livreurs">
+                    <div class="mb-3">
+                        <input type="search" class="form-control"
+                            placeholder="Rechercher par nom ou prénom" aria-label="Rechercher un livreur">
+                    </div>
+                    <ul class="list-group app-list-group mb-0" aria-label="Liste des livreurs">
                         <?php foreach (($livreurs ?? []) as $livreur): ?>
-                            <li class="app-list-item">
-                                <?= htmlspecialchars(($livreur['nom'] ?? '') . ' ' . ($livreur['prenom'] ?? '')) ?>
+                            <li class="list-group-item list-group-item-action" tabindex="0">
+                                <?= htmlspecialchars(($livreur['prenom'] ?? '') . ' ' . ($livreur['nom'] ?? '')) ?>
                             </li>
                         <?php endforeach; ?>
                     </ul>
                     <div class="app-panel-actions">
-                        <button type="button" class="app-icon-btn" title="Voir les paquets attribués" aria-label="Voir les paquets attribués">
+                        <button type="button" class="btn btn-outline-primary app-icon-btn" title="Voir les paquets attribués" aria-label="Voir les paquets attribués">
                             <i class="bi bi-search"></i>
                         </button>
                     </div>
