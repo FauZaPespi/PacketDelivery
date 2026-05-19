@@ -197,6 +197,27 @@ body {
     background-color: transparent;
 }
 
+/* ---------- Selectable list items ---------- */
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.app-list-group input[type="radio"] {
+    cursor: pointer;
+}
+
+/* ---------- Form styles ---------- */
+
+.app-form {
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+.app-form .form-label {
+    font-weight: 500;
+}
+
 /* ---------- Keyboard focus rings ---------- */
 
 .btn:focus-visible,

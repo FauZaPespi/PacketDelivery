@@ -38,8 +38,8 @@ class Database
     {
         return $this->pdo;
     }
-    
-    
+
+
     public function getAllEmployes(): array
     {
         $stmt = $this->getConnection()->query("SELECT * FROM Employe");
@@ -84,5 +84,173 @@ class Database
         return null;
     }
 
+    // ========== PAQUETS ==========
 
+    public function getAllPaquets(): array
+    {
+        $stmt = $this->getConnection()->query("
+            SELECT * FROM Paquet
+            ORDER BY dateLivraison DESC, numeroPostal ASC
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function searchPaquets(string $query): array
+    {
+        $stmt = $this->getConnection()->prepare("
+            SELECT * FROM Paquet
+            WHERE numeroPostal LIKE :query
+            ORDER BY dateLivraison DESC, numeroPostal ASC
+        ");
+        $stmt->execute(['query' => '%' . $query . '%']);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getPaquetById(string $id): ?array
+    {
+        $stmt = $this->getConnection()->prepare("SELECT * FROM Paquet WHERE numeroPostal = :id");
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    public function createPaquet(array $data): bool
+    {
+        $stmt = $this->getConnection()->prepare("
+            INSERT INTO Paquet (
+                numeroPostal, nomDestinataire, prenomDestinataire,
+                adresseDestinataire, latitudeAdresse, longitudeAdresse,
+                dateLivraison, id_employe_createur, id_employe_livreur, statutLivraison
+            ) VALUES (
+                :numeroPostal, :nomDestinataire, :prenomDestinataire,
+                :adresseDestinataire, :latitudeAdresse, :longitudeAdresse,
+                :dateLivraison, :id_employe_createur, :id_employe_livreur, 'Pas encore livré'
+            )
+        ");
+        return $stmt->execute($data);
+    }
+
+    public function updatePaquet(string $id, array $data): bool
+    {
+        $data['numeroPostal'] = $id;
+        $stmt = $this->getConnection()->prepare("
+            UPDATE Paquet SET
+                numeroPostal = :numeroPostal,
+                nomDestinataire = :nomDestinataire,
+                prenomDestinataire = :prenomDestinataire,
+                adresseDestinataire = :adresseDestinataire,
+                latitudeAdresse = :latitudeAdresse,
+                longitudeAdresse = :longitudeAdresse,
+                dateLivraison = :dateLivraison,
+                id_employe_livreur = :id_employe_livreur
+            WHERE numeroPostal = :numeroPostal
+        ");
+        return $stmt->execute($data);
+    }
+
+    public function deletePaquet(string $id): bool
+    {
+        $stmt = $this->getConnection()->prepare("DELETE FROM Paquet WHERE numeroPostal = :id");
+        return $stmt->execute(['id' => $id]);
+    }
+
+    public function canDeletePaquet(string $id): bool
+    {
+        $paquet = $this->getPaquetById($id);
+        if (!$paquet) {
+            return false;
+        }
+        // Impossible de supprimer si attribué à un livreur et date du jour
+        if ($paquet['id_employe_livreur'] && $paquet['dateLivraison'] == date('Y-m-d')) {
+            return false;
+        }
+        return true;
+    }
+
+    public function canModifyPaquet(string $id): bool
+    {
+        $paquet = $this->getPaquetById($id);
+        if (!$paquet) {
+            return false;
+        }
+        // Impossible de modifier si déjà livré
+        if ($paquet['statutLivraison'] === 'Livré') {
+            return false;
+        }
+        return true;
+    }
+
+    // ========== LIVREURS ==========
+
+    public function getAllLivreurs(): array
+    {
+        $stmt = $this->getConnection()->prepare("
+            SELECT * FROM Employe
+            WHERE estLivreur = 1
+            ORDER BY nom ASC, prenom ASC
+        ");
+        $stmt->execute();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function searchLivreurs(string $query): array
+    {
+        $stmt = $this->getConnection()->prepare("
+            SELECT * FROM Employe
+            WHERE estLivreur = 1 AND (nom LIKE :query OR prenom LIKE :query)
+            ORDER BY nom ASC, prenom ASC
+        ");
+        $stmt->execute(['query' => '%' . $query . '%']);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getPaquetsByLivreur(int $livreurId, string $date): array
+    {
+        $stmt = $this->getConnection()->prepare("
+            SELECT * FROM Paquet
+            WHERE id_employe_livreur = :livreur_id
+              AND dateLivraison = :date
+            ORDER BY ordreRouteLivraison ASC, numeroPostal ASC
+            LIMIT 10
+        ");
+        $stmt->execute(['livreur_id' => $livreurId, 'date' => $date]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getLivreursDisponibles(string $date): array
+    {
+        $stmt = $this->getConnection()->prepare("
+            SELECT e.*,
+                   COUNT(p.numeroPostal) as nb_paquets
+            FROM Employe e
+            LEFT JOIN Paquet p ON e.id_employe = p.id_employe_livreur
+                AND p.dateLivraison = :date
+            WHERE e.estLivreur = 1
+            GROUP BY e.id_employe
+            HAVING nb_paquets < 10
+            ORDER BY e.nom ASC, e.prenom ASC
+        ");
+        $stmt->execute(['date' => $date]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getEmployeById(int $id): ?array
+    {
+        $stmt = $this->getConnection()->prepare("SELECT * FROM Employe WHERE id_employe = :id");
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    public function getNextNumeroPostal(): string
+    {
+        $stmt = $this->getConnection()->query("
+            SELECT MAX(CAST(SUBSTRING(numeroPostal, 5) AS UNSIGNED)) as last_numero
+            FROM Paquet
+            WHERE numeroPostal LIKE 'PKG-%'
+        ");
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $nextNum = ($row['last_numero'] ?? 1200) + 1;
+        return 'PKG-' . $nextNum . '-CH';
+    }
 }

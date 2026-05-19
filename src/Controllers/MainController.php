@@ -6,8 +6,22 @@ use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Fauza\Template\Utils\SessionHandler;
 use Slim\Views\PhpRenderer;
+
 class MainController
 {
+    private function checkAdminAccess(Request $req, Response $resp): ?Response
+    {
+        SessionHandler::initSession();
+        if (!SessionHandler::IsLoggedIn()) {
+            return $resp->withHeader('Location', '/')->withStatus(302);
+        }
+        $user = SessionHandler::GetRawDataFromSession('user');
+        if ($user->estLivreur) {
+            return $resp->withHeader('Location', '/delivery')->withStatus(302);
+        }
+        return null;
+    }
+
     function home(Request $req, Response $resp, array $args): Response
     {
         SessionHandler::initSession();
@@ -61,32 +75,430 @@ class MainController
 
     function adminWindow(Request $req, Response $resp, array $args): Response
     {
-        SessionHandler::initSession();
-        if (!SessionHandler::IsLoggedIn()) {
-            return $resp->withHeader('Location', '/')->withStatus(302);
+        $check = $this->checkAdminAccess($req, $resp);
+        if ($check !== null) {
+            return $check;
         }
+
         $user = SessionHandler::GetRawDataFromSession('user');
-        if ($user->estLivreur) {
-            return $resp->withHeader('Location', '/delivery')->withStatus(302);
-        }
+        $db = Database::getInstance();
+
+        // Récupérer les paramètres de recherche
+        $paquetQuery = $req->getQueryParams()['paquet_search'] ?? '';
+        $livreurQuery = $req->getQueryParams()['livreur_search'] ?? '';
+
+        // Rechercher ou lister
+        $paquets = $paquetQuery
+            ? $db->searchPaquets($paquetQuery)
+            : $db->getAllPaquets();
+
+        $livreurs = $livreurQuery
+            ? $db->searchLivreurs($livreurQuery)
+            : $db->getAllLivreurs();
 
         $view = new PhpRenderer("../view");
         $view->setLayout("layout.php");
         $data = [
-            'title'    => "Packet Delivery — Espace administratif",
-            'year'     => date('Y'),
-            'user'     => $user,
-            'paquets'  => [
-                ['numero' => 'PKG-1201-CH', 'statut' => 'Pas encore livré'],
-                ['numero' => 'PKG-1219-CH', 'statut' => 'En cours de livraison'],
-                ['numero' => 'PKG-1227-CH', 'statut' => 'Livré'],
-            ],
-            'livreurs' => [
-                ['prenom' => 'Alice', 'nom' => 'Martin'],
-                ['prenom' => 'Luc',   'nom' => 'Bernard'],
-            ],
+            'title'        => "Packet Delivery — Espace administratif",
+            'year'         => date('Y'),
+            'user'         => $user,
+            'paquets'      => $paquets,
+            'livreurs'     => $livreurs,
+            'csrf'         => SessionHandler::CsrfToken(),
         ];
         return $view->render($resp, 'adminWindow.php', $data);
+    }
+
+    function searchPaquets(Request $req, Response $resp, array $args): Response
+    {
+        $check = $this->checkAdminAccess($req, $resp);
+        if ($check !== null) {
+            return $check;
+        }
+
+        $body = $req->getParsedBody() ?? [];
+        $query = $body['query'] ?? '';
+        $db = Database::getInstance();
+
+        $paquets = $query
+            ? $db->searchPaquets($query)
+            : $db->getAllPaquets();
+
+        // Re-render admin window with results
+        $user = SessionHandler::GetRawDataFromSession('user');
+        $view = new PhpRenderer("../view");
+        $view->setLayout("layout.php");
+        $data = [
+            'title'        => "Packet Delivery — Espace administratif",
+            'year'         => date('Y'),
+            'user'         => $user,
+            'paquets'      => $paquets,
+            'livreurs'     => $db->getAllLivreurs(),
+            'csrf'         => SessionHandler::CsrfToken(),
+        ];
+        return $view->render($resp, 'adminWindow.php', $data);
+    }
+
+    function searchLivreurs(Request $req, Response $resp, array $args): Response
+    {
+        $check = $this->checkAdminAccess($req, $resp);
+        if ($check !== null) {
+            return $check;
+        }
+
+        $body = $req->getParsedBody() ?? [];
+        $query = $body['query'] ?? '';
+        $db = Database::getInstance();
+
+        $livreurs = $query
+            ? $db->searchLivreurs($query)
+            : $db->getAllLivreurs();
+
+        // Re-render admin window with results
+        $user = SessionHandler::GetRawDataFromSession('user');
+        $view = new PhpRenderer("../view");
+        $view->setLayout("layout.php");
+        $data = [
+            'title'        => "Packet Delivery — Espace administratif",
+            'year'         => date('Y'),
+            'user'         => $user,
+            'paquets'      => $db->getAllPaquets(),
+            'livreurs'     => $livreurs,
+            'csrf'         => SessionHandler::CsrfToken(),
+        ];
+        return $view->render($resp, 'adminWindow.php', $data);
+    }
+
+    // ========== GESTION DES PAQUETS (FENÊTRE C) ==========
+
+    function paketAddForm(Request $req, Response $resp, array $args): Response
+    {
+        $check = $this->checkAdminAccess($req, $resp);
+        if ($check !== null) {
+            return $check;
+        }
+
+        $user = SessionHandler::GetRawDataFromSession('user');
+        $db = Database::getInstance();
+
+        // Calculer les dates valides (lendem du lendemain au +3 jours, lundi-vendredi)
+        $datesValides = $this->getDatesValides();
+
+        $view = new PhpRenderer("../view");
+        $view->setLayout("layout.php");
+        $data = [
+            'title'           => "Packet Delivery — Ajouter un paquet",
+            'year'            => date('Y'),
+            'user'            => $user,
+            'mode'            => 'add',
+            'csrf'            => SessionHandler::CsrfToken(),
+            'dates_valides'   => $datesValides,
+            'livreurs'        => $db->getAllLivreurs(),
+            'next_numero'     => $db->getNextNumeroPostal(),
+        ];
+        return $view->render($resp, 'paquetForm.php', $data);
+    }
+
+    function paketAdd(Request $req, Response $resp, array $args): Response
+    {
+        $check = $this->checkAdminAccess($req, $resp);
+        if ($check !== null) {
+            return $check;
+        }
+
+        $user = SessionHandler::GetRawDataFromSession('user');
+        $body = $req->getParsedBody() ?? [];
+
+        if (!SessionHandler::VerifyCsrf($body['_csrf'] ?? null)) {
+            return $resp->withHeader('Location', '/admin')->withStatus(302);
+        }
+
+        $db = Database::getInstance();
+
+        // Validation des champs
+        $errors = $this->validatePaquetData($body);
+        if (!empty($errors)) {
+            $view = new PhpRenderer("../view");
+            $view->setLayout("layout.php");
+            $data = [
+                'title'         => "Packet Delivery — Ajouter un paquet",
+                'year'          => date('Y'),
+                'user'          => $user,
+                'mode'          => 'add',
+                'csrf'          => SessionHandler::CsrfToken(),
+                'errors'        => $errors,
+                'paquet'        => $body,
+                'dates_valides' => $this->getDatesValides(),
+                'livreurs'      => $db->getAllLivreurs(),
+            ];
+            return $view->render($resp, 'paquetForm.php', $data);
+        }
+
+        // Créer le paquet
+        $result = $db->createPaquet([
+            'numeroPostal'          => $body['numero_postal'],
+            'nomDestinataire'       => $body['nom_destinataire'],
+            'prenomDestinataire'    => $body['prenom_destinataire'],
+            'adresseDestinataire'   => $body['adresse_destinataire'],
+            'latitudeAdresse'      => $body['latitude'],
+            'longitudeAdresse'     => $body['longitude'],
+            'dateLivraison'        => $body['date_livraison'],
+            'id_employe_createur'   => $user->id,
+            'id_employe_livreur'    => !empty($body['id_employe_livreur']) ? $body['id_employe_livreur'] : null,
+        ]);
+
+        if ($result) {
+            return $resp->withHeader('Location', '/admin')->withStatus(302);
+        }
+
+        // Erreur lors de la création
+        $view = new PhpRenderer("../view");
+        $view->setLayout("layout.php");
+        $data = [
+            'title'         => "Packet Delivery — Ajouter un paquet",
+            'year'          => date('Y'),
+            'user'          => $user,
+            'mode'          => 'add',
+            'csrf'          => SessionHandler::CsrfToken(),
+            'errors'        => ['Erreur lors de la création du paquet.'],
+            'paquet'        => $body,
+            'dates_valides' => $this->getDatesValides(),
+            'livreurs'      => $db->getAllLivreurs(),
+        ];
+        return $view->render($resp, 'paquetForm.php', $data);
+    }
+
+    function paketEditForm(Request $req, Response $resp, array $args): Response
+    {
+        $check = $this->checkAdminAccess($req, $resp);
+        if ($check !== null) {
+            return $check;
+        }
+
+        $user = SessionHandler::GetRawDataFromSession('user');
+        $db = Database::getInstance();
+        $paquetId = $args['id'] ?? '';
+
+        $paquet = $db->getPaquetById($paquetId);
+        if (!$paquet) {
+            return $resp->withHeader('Location', '/admin')->withStatus(302);
+        }
+
+        // Vérifier si le paquet peut être modifié
+        $canModify = $db->canModifyPaquet($paquetId);
+        $canDelete = $db->canDeletePaquet($paquetId);
+
+        // Dates valides pour la livraison
+        $datesValides = $this->getDatesValides();
+
+        $view = new PhpRenderer("../view");
+        $view->setLayout("layout.php");
+        $data = [
+            'title'           => "Packet Delivery — Modifier un paquet",
+            'year'            => date('Y'),
+            'user'            => $user,
+            'mode'            => 'edit',
+            'csrf'            => SessionHandler::CsrfToken(),
+            'paquet'          => $paquet,
+            'can_modify'      => $canModify,
+            'can_delete'      => $canDelete,
+            'dates_valides'   => $datesValides,
+            'livreurs'        => $db->getAllLivreurs(),
+            'is_view_only'    => !$canModify,
+        ];
+        return $view->render($resp, 'paquetForm.php', $data);
+    }
+
+    function paketEdit(Request $req, Response $resp, array $args): Response
+    {
+        $check = $this->checkAdminAccess($req, $resp);
+        if ($check !== null) {
+            return $check;
+        }
+
+        $user = SessionHandler::GetRawDataFromSession('user');
+        $body = $req->getParsedBody() ?? [];
+        $paquetId = $args['id'] ?? '';
+
+        if (!SessionHandler::VerifyCsrf($body['_csrf'] ?? null)) {
+            return $resp->withHeader('Location', '/admin')->withStatus(302);
+        }
+
+        $db = Database::getInstance();
+        $paquet = $db->getPaquetById($paquetId);
+        if (!$paquet) {
+            return $resp->withHeader('Location', '/admin')->withStatus(302);
+        }
+
+        // Vérifier si le paquet peut être modifié
+        if (!$db->canModifyPaquet($paquetId)) {
+            return $resp->withHeader('Location', '/admin/paquet/edit/' . $paquetId)->withStatus(302);
+        }
+
+        // Validation des champs
+        $errors = $this->validatePaquetData($body);
+        if (!empty($errors)) {
+            $view = new PhpRenderer("../view");
+            $view->setLayout("layout.php");
+            $data = [
+                'title'         => "Packet Delivery — Modifier un paquet",
+                'year'          => date('Y'),
+                'user'          => $user,
+                'mode'          => 'edit',
+                'csrf'          => SessionHandler::CsrfToken(),
+                'errors'        => $errors,
+                'paquet'        => array_merge($paquet, $body),
+                'can_modify'    => true,
+                'can_delete'    => $db->canDeletePaquet($paquetId),
+                'dates_valides' => $this->getDatesValides(),
+                'livreurs'      => $db->getAllLivreurs(),
+            ];
+            return $view->render($resp, 'paquetForm.php', $data);
+        }
+
+        // Modifier le paquet
+        $result = $db->updatePaquet($paquetId, [
+            'numeroPostal'          => $body['numero_postal'],
+            'nomDestinataire'       => $body['nom_destinataire'],
+            'prenomDestinataire'    => $body['prenom_destinataire'],
+            'adresseDestinataire'   => $body['adresse_destinataire'],
+            'latitudeAdresse'      => $body['latitude'],
+            'longitudeAdresse'     => $body['longitude'],
+            'dateLivraison'        => $body['date_livraison'],
+            'id_employe_livreur'    => !empty($body['id_employe_livreur']) ? $body['id_employe_livreur'] : null,
+        ]);
+
+        if ($result) {
+            return $resp->withHeader('Location', '/admin')->withStatus(302);
+        }
+
+        // Erreur lors de la modification
+        $view = new PhpRenderer("../view");
+        $view->setLayout("layout.php");
+        $data = [
+            'title'         => "Packet Delivery — Modifier un paquet",
+            'year'          => date('Y'),
+            'user'          => $user,
+            'mode'          => 'edit',
+            'csrf'          => SessionHandler::CsrfToken(),
+            'errors'        => ['Erreur lors de la modification du paquet.'],
+            'paquet'        => array_merge($paquet, $body),
+            'can_modify'    => true,
+            'can_delete'    => $db->canDeletePaquet($paquetId),
+            'dates_valides' => $this->getDatesValides(),
+            'livreurs'      => $db->getAllLivreurs(),
+        ];
+        return $view->render($resp, 'paquetForm.php', $data);
+    }
+
+    function paketDelete(Request $req, Response $resp, array $args): Response
+    {
+        $check = $this->checkAdminAccess($req, $resp);
+        if ($check !== null) {
+            return $check;
+        }
+
+        $body = $req->getParsedBody() ?? [];
+        $paquetId = $args['id'] ?? '';
+
+        if (!SessionHandler::VerifyCsrf($body['_csrf'] ?? null)) {
+            return $resp->withHeader('Location', '/admin')->withStatus(302);
+        }
+
+        $db = Database::getInstance();
+
+        // Vérifier si le paquet peut être supprimé
+        if (!$db->canDeletePaquet($paquetId)) {
+            // Rediriger avec un message d'erreur
+            return $resp->withHeader('Location', '/admin')->withStatus(302);
+        }
+
+        $db->deletePaquet($paquetId);
+        return $resp->withHeader('Location', '/admin')->withStatus(302);
+    }
+
+    // ========== VISUALISATION DES PAQUETS D'UN LIVREUR (FENÊTRE D) ==========
+
+    function livreurPaquets(Request $req, Response $resp, array $args): Response
+    {
+        $check = $this->checkAdminAccess($req, $resp);
+        if ($check !== null) {
+            return $check;
+        }
+
+        $user = SessionHandler::GetRawDataFromSession('user');
+        $livreurId = (int)($args['id'] ?? 0);
+        $date = $req->getQueryParams()['date'] ?? date('Y-m-d');
+
+        $db = Database::getInstance();
+        $livreur = $db->getEmployeById($livreurId);
+
+        if (!$livreur || !$livreur['estLivreur']) {
+            return $resp->withHeader('Location', '/admin')->withStatus(302);
+        }
+
+        $paquets = $db->getPaquetsByLivreur($livreurId, $date);
+
+        $view = new PhpRenderer("../view");
+        $view->setLayout("layout.php");
+        $data = [
+            'title'           => "Packet Delivery — Paquets de " . htmlspecialchars($livreur['prenom'] . ' ' . $livreur['nom']),
+            'year'            => date('Y'),
+            'user'            => $user,
+            'livreur'         => $livreur,
+            'date'            => $date,
+            'paquets'         => $paquets,
+            'csrf'            => SessionHandler::CsrfToken(),
+        ];
+        return $view->render($resp, 'livreurPaquets.php', $data);
+    }
+
+    // ========== FONCTIONS UTILITAIRES ==========
+
+    private function getDatesValides(): array
+    {
+        $dates = [];
+        $aujourdhui = new \DateTime();
+        $aujourdhui->modify('+1 day'); // Commencer demain
+
+        for ($i = 0; $i < 3; $i++) {
+            $date = clone $aujourdhui;
+            $date->modify("+$i day");
+            $jourSemaine = (int)$date->format('N');
+
+            // Lund (1) à Vendr (5)
+            if ($jourSemaine >= 1 && $jourSemaine <= 5) {
+                $dates[] = $date->format('Y-m-d');
+            }
+        }
+
+        return $dates;
+    }
+
+    private function validatePaquetData(array $data): array
+    {
+        $errors = [];
+
+        if (empty(trim($data['numero_postal'] ?? ''))) {
+            $errors[] = "Le numéro postal est requis.";
+        }
+        if (empty(trim($data['nom_destinataire'] ?? ''))) {
+            $errors[] = "Le nom du destinataire est requis.";
+        }
+        if (empty(trim($data['prenom_destinataire'] ?? ''))) {
+            $errors[] = "Le prénom du destinataire est requis.";
+        }
+        if (empty(trim($data['adresse_destinataire'] ?? ''))) {
+            $errors[] = "L'adresse du destinataire est requise.";
+        }
+        if (empty($data['latitude'] ?? '') || empty($data['longitude'] ?? '')) {
+            $errors[] = "La latitude et la longitude doivent être calculées.";
+        }
+        if (empty($data['date_livraison'] ?? '')) {
+            $errors[] = "La date de livraison est requise.";
+        }
+
+        return $errors;
     }
 
     function deliverWindow(Request $req, Response $resp, array $args): Response

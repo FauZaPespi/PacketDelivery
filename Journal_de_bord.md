@@ -1,0 +1,19 @@
+# Journal de bord
+
+| Projet | Auteur | Date |
+| - | - | - |
+| _Troisième projet de l'atelier web_ | _Calvo Oscar_ | 05.05.2026 - 05.06.2026 |
+
+> Dans ce fichier nous allons voir le journal de bord du projet PacketDelivery réalisé en fin d'année pour le cours d'Atelier Web proposé par Mme Moro
+
+## Jours
+
+**05.05.2026**
+Aujourdhui j'ai initiliasé le projet, j'ai lu l'énoncé afin de mieux comprendre ce qu'on me demandais, donc globalement cette journée à été peu productive mais très enrichissante, car sans elle, sans ce temps pris j'aurais pris trop de temps à lire et relire l'énoncé.
+J'ai crée donc le git et l'ai mis en remote sur [Github](https://github.com/FauZaPespi/PacketDelivery) 
+
+**12.05.2026**
+Contrairement a hier aujourdhui j'ai bien travailler, j'ai réalisé le squellete des pages principal, j'ai commencer par le login, puis une fois le login fini je suis passé au page administrateur et a la page livreur, ce n'est pas parfait mais c'est un squelette, tout le contenu minimum y est, ensuite j'ai demander a Qwen3 de me refaire le style CSS, je n'avais pas envie de perdre trop de temps la dessus, et etant donnée que le model est lent, il est parfait comme ça pendant qu'il réalise le CSS, je m'occupe de faire l'intégration de leaflet sur la page livreur, ce moment à été compliquer un moment, car je ne comprennais pas pourquoi la page ne voulais pas afficher la carte mais c'étais un probleme de cache avec mon navigateur.
+
+**19.05.2026**
+Aujourd'hui j'essaie de régler les quelque probleme de CSS que Qwen a pu laisser, je fais un petit check up pour voir si il n'a toucher a rien d'autre et je me mets a implémenter les page administrateur comme demander dans l'énoncé.
