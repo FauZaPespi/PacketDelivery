@@ -110,8 +110,7 @@ class Database
     {
         $stmt = $this->getConnection()->prepare("SELECT * FROM Paquet WHERE numeroPostal = :id");
         $stmt->execute(['id' => $id]);
-        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-        return $row ?: null;
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
     }
 
     public function createPaquet(array $data): bool
@@ -180,6 +179,83 @@ class Database
         return true;
     }
 
+    public function marquerLivraison(string $idPaquet, int $idLivreur): bool
+    {
+        // Vérifier d'abord si le paquet peut être marqué comme livré
+        $paquet = $this->getPaquetById($idPaquet);
+        if (!$paquet || $paquet['statutLivraison'] === 'Livré') {
+            return false;
+        }
+
+        // Si le paquet n'a pas encore de route, en créer une
+        if (!$paquet['id_route'] && $paquet['dateLivraison'] == date('Y-m-d')) {
+            $this->creerRoutePourLivreur($idLivreur, $paquet['dateLivraison']);
+            // Récupérer la route créée
+            $route = $this->getConnection()->prepare("
+                SELECT id_route FROM RouteLivraison
+                WHERE id_employe_livreur = :livreur_id AND dateRoute = :date
+            ");
+            $route->execute(['livreur_id' => $idLivreur, 'date' => $paquet['dateLivraison']]);
+            $idRoute = $route->fetchColumn();
+            $idRoute = $idRoute ? (int)$idRoute : null;
+        } else {
+            $idRoute = $paquet['id_route'] ?? null;
+        }
+
+        // Mettre à jour le paquet comme livré
+        $stmt = $this->getConnection()->prepare("
+            UPDATE Paquet SET
+                statutLivraison = 'Livré',
+                date_heure_livraison = NOW(),
+                id_route = :id_route
+            WHERE numeroPostal = :id_paquet
+        ");
+        return $stmt->execute([
+            'id_paquet' => $idPaquet,
+            'id_route' => $idRoute
+        ]);
+    }
+
+    private function creerRoutePourLivreur(int $livreurId, string $date): void
+    {
+        // Vérifier si une route existe déjà pour ce livreur et cette date
+        $existing = $this->getConnection()->prepare("
+            SELECT id_route FROM RouteLivraison
+            WHERE id_employe_livreur = :livreur_id AND dateRoute = :date
+        ");
+        $existing->execute(['livreur_id' => $livreurId, 'date' => $date]);
+        if ($existing->fetchColumn()) {
+            return;
+        }
+
+        // Créer la route
+        $stmt = $this->getConnection()->prepare("
+            INSERT INTO RouteLivraison (id_employe_livreur, dateRoute)
+            VALUES (:livreur_id, :date)
+        ");
+        $stmt->execute(['livreur_id' => $livreurId, 'date' => $date]);
+    }
+
+    public function marquerEnCoursDeLivraison(string $idPaquet): bool
+    {
+        $stmt = $this->getConnection()->prepare("
+            UPDATE Paquet SET statutLivraison = 'En cours de livraison' WHERE numeroPostal = :id
+        ");
+        return $stmt->execute(['id' => $idPaquet]);
+    }
+
+    public function getPaquetsEnCoursOuNonLivres(string $date): array
+    {
+        $stmt = $this->getConnection()->prepare("
+            SELECT * FROM Paquet
+            WHERE dateLivraison = :date
+              AND statutLivraison IN ('Pas encore livré', 'En cours de livraison')
+            ORDER BY numeroPostal ASC
+        ");
+        $stmt->execute(['date' => $date]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
     // ========== LIVREURS ==========
 
     public function getAllLivreurs(): array
@@ -210,8 +286,6 @@ class Database
             SELECT * FROM Paquet
             WHERE id_employe_livreur = :livreur_id
               AND dateLivraison = :date
-            ORDER BY ordreRouteLivraison ASC, numeroPostal ASC
-            LIMIT 10
         ");
         $stmt->execute(['livreur_id' => $livreurId, 'date' => $date]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -221,7 +295,7 @@ class Database
     {
         $stmt = $this->getConnection()->prepare("
             SELECT e.*,
-                   COUNT(p.numeroPostal) as nb_paquets
+                   COUNT(p.id_paquet) as nb_paquets
             FROM Employe e
             LEFT JOIN Paquet p ON e.id_employe = p.id_employe_livreur
                 AND p.dateLivraison = :date

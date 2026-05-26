@@ -55,18 +55,26 @@
                         <tbody>
                             <?php foreach (($paquets ?? []) as $paquet): ?>
                                 <tr>
-                                    <td><?= htmlspecialchars($paquet['numeroPostal']) ?></td>
+                                    <td><?= htmlspecialchars($paquet['numero_postal']) ?></td>
                                     <td><?= htmlspecialchars($paquet['prenomDestinataire'] . ' ' . $paquet['nomDestinataire']) ?></td>
                                     <td><?= htmlspecialchars($paquet['adresseDestinataire']) ?></td>
                                     <td>
-                                        <span class="badge text-bg-<?= $paquet['statutLivraison'] === 'En transit' ? 'info' : ($paquet['statutLivraison'] === 'Livré' ? 'success' : 'warning') ?>">
+                                        <span class="badge text-bg-<?= $paquet['statutLivraison'] === 'En cours de livraison' ? 'info' : ($paquet['statutLivraison'] === 'Livré' ? 'success' : 'warning') ?>">
                                             <?= htmlspecialchars($paquet['statutLivraison']) ?>
                                         </span>
                                     </td>
                                     <td>
-                                        <a href="/admin/paquet/edit/<?= $paquet['id_paquet'] ?>" class="btn btn-sm btn-outline-primary" title="Voir les détails">
-                                            <i class="bi bi-eye"></i>
-                                        </a>
+                                        <?php if ($paquet['statutLivraison'] !== 'Livré'): ?>
+                                            <form method="post" action="/admin/paquet/livre/<?= $paquet['numero_postal'] ?>" class="d-inline">
+                                                <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>">
+                                                <button type="submit" class="btn btn-sm btn-success" title="Marquer comme livré"
+                                                    onclick="return confirm('Marquer ce paquet comme livré ?');">
+                                                    <i class="bi bi-check-circle"></i> Livré
+                                                </button>
+                                            </form>
+                                        <?php else: ?>
+                                            <span class="text-success small fw-bold">Livré</span>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

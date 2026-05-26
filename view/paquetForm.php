@@ -43,6 +43,12 @@
                     </div>
                 <?php endif; ?>
 
+                <?php if (($paquet['statutLivraison'] ?? '') === 'Livré'): ?>
+                    <div class="alert alert-info" role="alert">
+                        Ce paquet est livré. Le bouton de modification est grisé.
+                    </div>
+                <?php endif; ?>
+
                 <form method="post" action="<?= $mode === 'add' ? '/admin/paquet/add' : '/admin/paquet/edit/' . ($paquet['numeroPostal'] ?? '') ?>" class="app-form">
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>">
 

@@ -139,6 +139,6 @@ function hasSelectedValue(name) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Auto-check based on stored selection if needed
+
 });
 </script>

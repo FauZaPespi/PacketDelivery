@@ -22,6 +22,19 @@ class MainController
         return null;
     }
 
+    private function checkLivreurAccess(Request $req, Response $resp): ?Response
+    {
+        SessionHandler::initSession();
+        if (!SessionHandler::IsLoggedIn()) {
+            return $resp->withHeader('Location', '/')->withStatus(302);
+        }
+        $user = SessionHandler::GetRawDataFromSession('user');
+        if (!$user->estLivreur) {
+            return $resp->withHeader('Location', '/admin')->withStatus(302);
+        }
+        return null;
+    }
+
     function home(Request $req, Response $resp, array $args): Response
     {
         SessionHandler::initSession();
@@ -417,18 +430,55 @@ class MainController
         return $resp->withHeader('Location', '/admin')->withStatus(302);
     }
 
-    // ========== VISUALISATION DES PAQUETS D'UN LIVREUR (FENÊTRE D) ==========
-
-    function livreurPaquets(Request $req, Response $resp, array $args): Response
+    function paketLivre(Request $req, Response $resp, array $args): Response
     {
-        $check = $this->checkAdminAccess($req, $resp);
+        $check = $this->checkLivreurAccess($req, $resp);
         if ($check !== null) {
             return $check;
         }
 
+        $body = $req->getParsedBody() ?? [];
+        $paquetId = $args['id'] ?? '';
+
+        if (!SessionHandler::VerifyCsrf($body['_csrf'] ?? null)) {
+            return $resp->withHeader('Location', '/delivery')->withStatus(302);
+        }
+
+        $user = SessionHandler::GetRawDataFromSession('user');
+        $db = Database::getInstance();
+
+        // Vérifier si le paquet existe et n'est pas déjà livré
+        $paquet = $db->getPaquetById($paquetId);
+        if (!$paquet || $paquet['statut'] === 'Livré') {
+            return $resp->withHeader('Location', '/delivery')->withStatus(302);
+        }
+
+        // Marquer comme livré
+        $result = $db->marquerLivraison($paquetId, $user->id);
+
+        if ($result) {
+            return $resp->withHeader('Location', '/delivery?date=' . $paquet['date_livraison'])->withStatus(302);
+        }
+
+        return $resp->withHeader('Location', '/delivery')->withStatus(302);
+    }
+
+    // ========== VISUALISATION DES PAQUETS D'UN LIVREUR (FENÊTRE D) ==========
+
+    function paketLivreurPaquets(Request $req, Response $resp, array $args): Response
+    {
+        // Seul l'admin ou le livreur concerné peut accéder à cette page
+        SessionHandler::initSession();
+        if (!SessionHandler::IsLoggedIn()) {
+            return $resp->withHeader('Location', '/')->withStatus(302);
+        }
         $user = SessionHandler::GetRawDataFromSession('user');
         $livreurId = (int)($args['id'] ?? 0);
-        $date = $req->getQueryParams()['date'] ?? date('Y-m-d');
+
+        // Admin peut voir toutes les pages livreurs, mais livreur doit être celui dont on affiche les paquets
+        if ($user->estLivreur && $user->id != $livreurId) {
+            return $resp->withHeader('Location', '/delivery')->withStatus(302);
+        }
 
         $db = Database::getInstance();
         $livreur = $db->getEmployeById($livreurId);
@@ -436,6 +486,13 @@ class MainController
         if (!$livreur || !$livreur['estLivreur']) {
             return $resp->withHeader('Location', '/admin')->withStatus(302);
         }
+
+        // Si c'est un livreur, rediriger vers sa propre page
+        if ($user->estLivreur && $user->id == $livreurId) {
+            return $resp->withHeader('Location', '/delivery')->withStatus(302);
+        }
+
+        $date = $req->getQueryParams()['date'] ?? date('Y-m-d');
 
         $paquets = $db->getPaquetsByLivreur($livreurId, $date);
 
@@ -512,14 +569,20 @@ class MainController
             return $resp->withHeader('Location', '/admin')->withStatus(302);
         }
 
+        $db = Database::getInstance();
+        $date = $req->getQueryParams()['date'] ?? date('Y-m-d');
+        $paquets = $db->getPaquetsByLivreur($user->id, $date);
+
         $view = new PhpRenderer("../view");
         $view->setLayout("layout.php");
         $data = [
             'title'        => "Packet Delivery — Espace livreur",
             'year'         => date('Y'),
             'user'         => $user,
-            'dateAffichee' => 'Mardi 12 mai 2026',
+            'dateAffichee' => date('l, Y-m-d'), // Today's date in French format
             'message'      => '',
+            'paquets'      => $paquets,
+            'csrf'         => SessionHandler::CsrfToken(),
         ];
         return $view->render($resp, 'deliverWindow.php', $data);
     }
