@@ -244,6 +244,53 @@ class Database
         return $stmt->execute(['id' => $idPaquet]);
     }
 
+    public function updatePackageOrder(string $idPaquet, int $ordre, int $livreurId, string $date): bool
+    {
+        $this->creerRoutePourLivreur($livreurId, $date);
+
+        $routeStmt = $this->getConnection()->prepare("
+            SELECT id_route FROM RouteLivraison
+            WHERE id_employe_livreur = :livreur_id AND dateRoute = :date
+        ");
+        $routeStmt->execute(['livreur_id' => $livreurId, 'date' => $date]);
+        $idRoute = (int)$routeStmt->fetchColumn();
+
+        $stmt = $this->getConnection()->prepare("
+            UPDATE Paquet SET ordreRouteLivraison = :ordre, id_route = :id_route
+            WHERE numeroPostal = :id
+              AND id_employe_livreur = :livreur_id
+              AND dateLivraison = :date
+        ");
+        $ok = $stmt->execute([
+            'ordre'      => $ordre,
+            'id_route'   => $idRoute,
+            'id'         => $idPaquet,
+            'livreur_id' => $livreurId,
+            'date'       => $date,
+        ]);
+
+        if (!$ok) return false;
+
+        // Si tous les colis du livreur pour cette date ont un ordre → "En cours de livraison"
+        $pending = $this->getConnection()->prepare("
+            SELECT COUNT(*) FROM Paquet
+            WHERE id_employe_livreur = :livreur_id
+              AND dateLivraison = :date
+              AND ordreRouteLivraison IS NULL
+        ");
+        $pending->execute(['livreur_id' => $livreurId, 'date' => $date]);
+
+        if ((int)$pending->fetchColumn() === 0) {
+            foreach ($this->getPaquetsByLivreur($livreurId, $date) as $p) {
+                if ($p['statutLivraison'] === 'Pas encore livré') {
+                    $this->marquerEnCoursDeLivraison($p['numeroPostal']);
+                }
+            }
+        }
+
+        return true;
+    }
+
     public function getPaquetsEnCoursOuNonLivres(string $date): array
     {
         $stmt = $this->getConnection()->prepare("

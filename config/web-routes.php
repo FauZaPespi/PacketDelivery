@@ -23,3 +23,4 @@ $app->post('/admin/livreurs/search', [ MainController::class, 'searchLivreurs' ]
 // Routes Livreur
 $app->get('/delivery', [ MainController::class, 'deliverWindow' ]);
 $app->post('/delivery/paquet/livre/{id}', [ MainController::class, 'paketLivre' ]);
+$app->post('/delivery/paquet/ordre/{id}', [ MainController::class, 'paketUpdateOrdre' ]);

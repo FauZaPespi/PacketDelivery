@@ -449,7 +449,7 @@ class MainController
 
         // Vérifier si le paquet existe et n'est pas déjà livré
         $paquet = $db->getPaquetById($paquetId);
-        if (!$paquet || $paquet['statut'] === 'Livré') {
+        if (!$paquet || $paquet['statutLivraison'] === 'Livré') {
             return $resp->withHeader('Location', '/delivery')->withStatus(302);
         }
 
@@ -560,31 +560,83 @@ class MainController
 
     function deliverWindow(Request $req, Response $resp, array $args): Response
     {
-        SessionHandler::initSession();
-        if (!SessionHandler::IsLoggedIn()) {
-            return $resp->withHeader('Location', '/')->withStatus(302);
-        }
+        $check = $this->checkLivreurAccess($req, $resp);
+        if ($check !== null) return $check;
+
         $user = SessionHandler::GetRawDataFromSession('user');
-        if (!$user->estLivreur) {
-            return $resp->withHeader('Location', '/admin')->withStatus(302);
+        $db   = Database::getInstance();
+
+        $date = $req->getQueryParams()['date'] ?? date('Y-m-d');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            $date = date('Y-m-d');
         }
 
-        $db = Database::getInstance();
-        $date = $req->getQueryParams()['date'] ?? date('Y-m-d');
-        $paquets = $db->getPaquetsByLivreur($user->id, $date);
+        $paquets          = $db->getPaquetsByLivreur($user->id, $date);
+        $isToday          = ($date === date('Y-m-d'));
+        $routeComplete    = !empty($paquets) && count(array_filter($paquets, fn($p) => $p['ordreRouteLivraison'] === null)) === 0;
+        $deliveriesStarted = count(array_filter($paquets, fn($p) => in_array($p['statutLivraison'], ['Livré', 'En cours de livraison']))) > 0;
+        $allDelivered     = !empty($paquets) && count(array_filter($paquets, fn($p) => $p['statutLivraison'] !== 'Livré')) === 0;
 
         $view = new PhpRenderer("../view");
         $view->setLayout("layout.php");
         $data = [
-            'title'        => "Packet Delivery — Espace livreur",
-            'year'         => date('Y'),
-            'user'         => $user,
-            'dateAffichee' => date('l, Y-m-d'), // Today's date in French format
-            'message'      => '',
-            'paquets'      => $paquets,
-            'csrf'         => SessionHandler::CsrfToken(),
+            'title'            => "Packet Delivery — Espace livreur",
+            'year'             => date('Y'),
+            'user'             => $user,
+            'date'             => $date,
+            'dateAffichee'     => $this->formatDateFr($date),
+            'isToday'          => $isToday,
+            'routeComplete'    => $routeComplete,
+            'deliveriesStarted' => $deliveriesStarted,
+            'allDelivered'     => $allDelivered,
+            'paquets'          => $paquets,
+            'csrf'             => SessionHandler::CsrfToken(),
         ];
         return $view->render($resp, 'deliverWindow.php', $data);
+    }
+
+    function paketUpdateOrdre(Request $req, Response $resp, array $args): Response
+    {
+        $check = $this->checkLivreurAccess($req, $resp);
+        if ($check !== null) return $check;
+
+        $body     = $req->getParsedBody() ?? [];
+        $paquetId = $args['id'] ?? '';
+        $date     = $body['date'] ?? date('Y-m-d');
+
+        $redirect = fn() => $resp->withHeader('Location', '/delivery?date=' . urlencode($date))->withStatus(302);
+
+        if (!SessionHandler::VerifyCsrf($body['_csrf'] ?? null)) return $redirect();
+        if ($date !== date('Y-m-d')) return $redirect();
+
+        $user   = SessionHandler::GetRawDataFromSession('user');
+        $db     = Database::getInstance();
+        $paquets = $db->getPaquetsByLivreur($user->id, $date);
+
+        foreach ($paquets as $p) {
+            if (in_array($p['statutLivraison'], ['Livré', 'En cours de livraison'])) return $redirect();
+        }
+
+        // Vérifier que le colis appartient bien à ce livreur pour cette date (IDOR guard)
+        if (!in_array($paquetId, array_column($paquets, 'numeroPostal'), true)) return $redirect();
+
+        $ordre = (int)($body['ordre'] ?? 0);
+        if ($ordre < 1 || $ordre > count($paquets)) return $redirect();
+
+        $db->updatePackageOrder($paquetId, $ordre, $user->id, $date);
+        return $redirect();
+    }
+
+    private function formatDateFr(string $date): string
+    {
+        $jours = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+        $mois  = ['', 'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+                  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+        $ts    = strtotime($date);
+        return $jours[(int)date('w', $ts)]
+             . ' ' . date('d', $ts)
+             . ' ' . $mois[(int)date('n', $ts)]
+             . ' ' . date('Y', $ts);
     }
 
     function logout(Request $req, Response $resp, array $args): Response
