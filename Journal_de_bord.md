@@ -1,7 +1,7 @@
 # Journal de bord
 
-| Projet | Auteur | Date |
-| - | - | - |
+| Projet                              | Auteur        | Date                    |
+| ----------------------------------- | ------------- | ----------------------- |
 | _Troisième projet de l'atelier web_ | _Calvo Oscar_ | 05.05.2026 - 05.06.2026 |
 
 > Dans ce fichier nous allons voir le journal de bord du projet PacketDelivery réalisé en fin d'année pour le cours d'Atelier Web proposé par Mme Moro
@@ -22,3 +22,5 @@ Aujourd'hui j'essaie de régler les quelque probleme de CSS que Qwen a pu laisse
 **26.05.2026**
 Aujourd'hui j'ai perdu la premiere heure du a un probleme technique avec mon disque, l'objectif d'aujourd'hui c'est de faire en sorte que les pages sois fonctionnel telle que demander dans le cahier des charges.
 
+**02.06.2026**
+Il me restais la page de livraison à réaliser, je pense que j'ai fait ce qu'il était demander, aujourd'hui Maksym Ptytsia n'est pas présentais mais dès que je le vois je lui demande si il n'a pas le MCD MLD de la base de donnée pour ajouter du contexte.
