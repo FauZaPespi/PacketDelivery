@@ -23,4 +23,5 @@ Aujourd'hui j'essaie de régler les quelque probleme de CSS que Qwen a pu laisse
 Aujourd'hui j'ai perdu la premiere heure du a un probleme technique avec mon disque, l'objectif d'aujourd'hui c'est de faire en sorte que les pages sois fonctionnel telle que demander dans le cahier des charges.
 
 **02.06.2026**
-Il me restais la page de livraison à réaliser, je pense que j'ai fait ce qu'il était demander, aujourd'hui Maksym Ptytsia n'est pas présentais mais dès que je le vois je lui demande si il n'a pas le MCD MLD de la base de donnée pour ajouter du contexte.
+Il me restais la page de livraison à réaliser, je pense que j'ai fait ce qu'il était demander, j'ai demander a Claude un exemple de code pour les lignes entre les points parce qu'il fallait faire des polygone, et c'était le genre de choses ou l'ia ne fera pas d'erreur mais moi si, aujourd'hui Maksym Ptytsia n'est pas présentais mais dès que je le vois je lui demande si il n'a pas le MCD MLD de la base de donnée pour ajouter du contexte.
+Je vais relire l'énoncé pour être sûr de rien oublier.

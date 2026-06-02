@@ -55,7 +55,7 @@
                         <tbody>
                             <?php foreach (($paquets ?? []) as $paquet): ?>
                                 <tr>
-                                    <td><?= htmlspecialchars($paquet['numero_postal']) ?></td>
+                                    <td><?= htmlspecialchars($paquet['numeroPostal']) ?></td>
                                     <td><?= htmlspecialchars($paquet['prenomDestinataire'] . ' ' . $paquet['nomDestinataire']) ?></td>
                                     <td><?= htmlspecialchars($paquet['adresseDestinataire']) ?></td>
                                     <td>
@@ -65,7 +65,7 @@
                                     </td>
                                     <td>
                                         <?php if ($paquet['statutLivraison'] !== 'Livré'): ?>
-                                            <form method="post" action="/admin/paquet/livre/<?= $paquet['numero_postal'] ?>" class="d-inline">
+                                            <form method="post" action="/admin/paquet/livre/<?= $paquet['numeroPostal'] ?>" class="d-inline">
                                                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf ?? '') ?>">
                                                 <button type="submit" class="btn btn-sm btn-success" title="Marquer comme livré"
                                                     onclick="return confirm('Marquer ce paquet comme livré ?');">

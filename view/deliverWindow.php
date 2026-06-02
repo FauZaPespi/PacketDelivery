@@ -162,14 +162,13 @@
 
 <script>
 (function () {
-    // ── Données PHP → JS ──────────────────────────────────────────
+    // PHP -> JS
     var paquets           = <?= json_encode(array_values($paquets ?? [])) ?>;
     var isToday           = <?= json_encode($isToday ?? false) ?>;
     var routeComplete     = <?= json_encode($routeComplete ?? false) ?>;
     var deliveriesStarted = <?= json_encode($deliveriesStarted ?? false) ?>;
     var currentDate       = <?= json_encode($date ?? date('Y-m-d')) ?>;
 
-    // ── Navigation de date (skip week-end) ────────────────────────
     function nextWeekday(dateStr, dir) {
         var parts = dateStr.split('-');
         var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
@@ -186,7 +185,6 @@
         window.location.href = '/delivery?date=' + nextWeekday(currentDate, 1);
     });
 
-    // ── Carte Leaflet ─────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function () {
         var map = L.map('map').setView([46.2044, 6.1432], 13);
 
@@ -197,7 +195,6 @@
 
         if (paquets.length === 0) return;
 
-        // Centrer sur le centroïde des colis
         var sumLat = 0, sumLng = 0, n = 0;
         paquets.forEach(function (p) {
             if (p.latitudeAdresse && p.longitudeAdresse) {
@@ -236,7 +233,7 @@
             });
         }
 
-        // Polyligne de la route (colis ordonnés)
+        // Ces parties on été aidé par l'ia poru réaliser la ligne entre les points
         var ordered = paquets
             .filter(function (p) { return p.ordreRouteLivraison !== null; })
             .sort(function (a, b) {
@@ -250,7 +247,6 @@
             L.polyline(coords, { color: '#3b82f6', weight: 3, opacity: 0.7, dashArray: '8 5' }).addTo(map);
         }
 
-        // Marqueurs
         paquets.forEach(function (p) {
             if (!p.latitudeAdresse || !p.longitudeAdresse) return;
             var marker = L.marker(
@@ -266,7 +262,6 @@
             });
         });
 
-        // ── Builder du popup ─────────────────────────────────────
         function buildPopupContent(p) {
             var d = document.createElement('div');
             d.style.minWidth = '170px';
@@ -294,13 +289,11 @@
             btns.style.display = 'grid';
             btns.style.gap = '4px';
 
-            // Bouton 1 – Informations (toujours visible)
             btns.appendChild(mkBtn('btn-outline-secondary', 'bi-info-circle', 'Informations', function () {
                 map.closePopup();
                 openInfoModal(p);
             }));
 
-            // Bouton 2 – Modifier l'ordre (aujourd'hui, avant démarrage des livraisons, non livré)
             if (isToday && !deliveriesStarted && p.statutLivraison !== 'Livré') {
                 btns.appendChild(mkBtn('btn-outline-primary', 'bi-list-ol', "Modifier l'ordre", function () {
                     map.closePopup();
@@ -308,7 +301,6 @@
                 }));
             }
 
-            // Bouton 3 – Indiquer la livraison (route complète, non livré, aujourd'hui)
             if (isToday && routeComplete && p.statutLivraison !== 'Livré') {
                 btns.appendChild(mkBtn('btn-success', 'bi-check-circle', 'Indiquer la livraison', function () {
                     map.closePopup();
@@ -330,9 +322,8 @@
             b.addEventListener('click', handler);
             return b;
         }
-    }); // end DOMContentLoaded
+    });
 
-    // ── Fonctions d'ouverture des modaux ─────────────────────────
     var statusBadge = {
         'Livré':               'success',
         'En cours de livraison': 'info',
@@ -358,7 +349,7 @@
         input.value = p.ordreRouteLivraison !== null ? p.ordreRouteLivraison : '';
         input.max   = paquets.length;
         document.getElementById('ordreHelpText').textContent =
-            'Entrez un numéro entre 1 et ' + paquets.length + '.';
+            'Entrez un numero entr 1 et ' + paquets.length + '.';
         document.getElementById('formOrdre').action =
             '/delivery/paquet/ordre/' + encodeURIComponent(p.numeroPostal);
         bootstrap.Modal.getOrCreateInstance(document.getElementById('modalOrdre')).show();
